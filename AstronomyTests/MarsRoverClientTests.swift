@@ -11,8 +11,10 @@ import XCTest
 
 struct MockLoader: NetworkDataLoader {
     
-    var data: Data
-    var error: Error
+    var data: Data?
+    var error: Error?
+    var request: URLRequest?
+    var url: URL?
     
     func loadData(from request: URLRequest, completion: @escaping (Data?, Error?) -> Void) {
         DispatchQueue.main.async {
@@ -32,18 +34,65 @@ class MarsRoverClientTests: XCTestCase {
     /*
      What to test?
      - fetchMarsRover
-         - Test the data
-         - Base URL and the constructed URL are correct?
-         - Verify the dataTask is being completed
-         - Test that it can decode with JSON?
-         - Valid JSON
-         - Invalid JSON
-         - Is the completion handler being called if networking fails?
-         - Is the completion handler being called if the data is bad?
-         - Is the completion handler being called with valid data?
      - fetchPhotos
      - fetch Generic
      */
     
+    func testFetchMarsRoverDataTaskIsCompleted() {
+        mockFetch(dataSource: validRoverJSON)
+    }
     
+    func testFetchMarsRoverHandlesBadJsonData() {
+        mockFetch(dataSource: invalidRoverJSON, shouldShowError: true)
+    }
+    
+    func testFetchMarsRoverHandlesNoResultsInJsonData() {
+        mockFetch(dataSource: noResultsRoverJSON, shouldShowError: true)
+    }
+    
+    func testFetchPhotosDataTaskIsCompleted() {
+        mockFetch(dataSource: validRoverJSON)
+    
+        let photosExpectation = expectation(description: "Photos request")
+        
+        let roverToFetch = rover?.solDescriptions[0]
+        
+        self.marsRover?.fetchPhotos(from: rover!, onSol: roverToFetch!.sol) { (_, error) in
+            photosExpectation.fulfill()
+//            XCTAssertNil(error)
+        }
+        wait(for: [photosExpectation], timeout: 2.0)
+    }
+    
+    func testFetchPhotosHandlesBadJsonData() {
+        
+    }
+    
+    func testFetchPhotosHandlesNoResultsInJsonData() {
+        
+    }
+    
+    private func mockFetch(dataSource: Data, shouldShowError: Bool = false) {
+        var mock = MockLoader()
+        mock.data = dataSource
+        self.marsRover = MarsRoverClient(networkLoader: mock)
+        let roverExpection = expectation(description: "Rover Data Request")
+        
+        marsRover?.fetchMarsRover(named: "Curiosity") { (marsRover, error) in
+            
+            roverExpection.fulfill()
+            if shouldShowError {
+                XCTAssertNil(marsRover)
+                XCTAssertNotNil(error)
+            } else {
+                XCTAssertNil(error)
+                XCTAssertNotNil(marsRover)
+            }
+            self.rover = marsRover
+        }
+        wait(for: [roverExpection], timeout: 2.0)
+    }
+    
+    private var rover: MarsRover?
+    private var marsRover: MarsRoverClient?
 }
